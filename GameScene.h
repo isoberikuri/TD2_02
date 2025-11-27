@@ -3,7 +3,8 @@
 #include "Player.h"
 #include "Bullet.h"
 
-class GameScene {
+class GameScene
+{
 public:
 	// 初期化
 	void Initialize();
