@@ -56,7 +56,7 @@ void GameScene::Update() {
 		currentType = 2;
 	if (bullet_->bullet3Operation_ == 1)
 		currentType = 3;
-	if (bullet_->bullet4Rapid_ == 1)
+	if (bullet_->bullet4SpeedChange_ == 1)
 		currentType = 4;
 	if (bullet_->bullet5Trident_ == 1)
 		currentType = 5;

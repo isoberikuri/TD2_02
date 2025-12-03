@@ -34,18 +34,19 @@ public:
 	int bullet2Reflect_ = false;
 	//操作
 	int bullet3Operation_ = false;
-	//連射
-	int bullet4Rapid_ = false;
-	struct BulletData
-	{
-		bool active = false;
-		KamataEngine::Vector3 position;
-		KamataEngine::Vector2 velocity;
-	};
-	static const int MAX_BULLETS = 20; // 連射数
-	BulletData bullets_[MAX_BULLETS];
+	//連射　変更->　スピード変化
+	int bullet4SpeedChange_ = false;
+
+	float currentSpeed_ = 0.0f;          // 現在の弾速
+	float bullet4Acceleration_ = 0.05f;  // 加速度
+	float maxSpeed_ = 1.5f;              // 最大速度
+	float minSpeed_ = -1.0f;             // 最小速度
+
 	//3方向
 	int bullet5Trident_ = false;
+	KamataEngine::WorldTransform bullet5WorldTransform_[3];     // 基本データ
+	KamataEngine::Vector3 bullet5Velocity_[3] = {};             // 基本データ
+	KamataEngine::Vector3 bullet5GetWorldPosition(int i);       // ワールド座標の取得
 
 	//==========//
 	//  全弾用  //

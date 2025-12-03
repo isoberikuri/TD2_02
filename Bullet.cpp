@@ -11,6 +11,12 @@ void Bullet::Initialize(Model* model, Camera* camera, Vector3& position)
 	assert(model);
 	bulletModel_ = model;
 	bulletWorldTransform_.translation_ = position;
+	for (int i = 0; i < 3; i++)
+	{
+		bullet5WorldTransform_[i].translation_ = position;
+		bullet5WorldTransform_[i].translation_.x += i;
+		bullet5WorldTransform_[i].Initialize();
+	}
 	bulletCamera_ = camera;
 	bulletWorldTransform_.Initialize();
 
@@ -29,6 +35,16 @@ Vector3 Bullet::GetWorldPosition()
 
 }
 
+KamataEngine::Vector3 Bullet::bullet5GetWorldPosition(int i)
+{
+	Vector3 bullet5WorldPos;
+	// ワールド行列の平行移動成分（弾の現在位置）を取得
+	bullet5WorldPos.x = bullet5WorldTransform_[i].matWorld_.m[3][0];
+	bullet5WorldPos.y = bullet5WorldTransform_[i].matWorld_.m[3][1];
+	bullet5WorldPos.z = bullet5WorldTransform_[i].matWorld_.m[3][2];
+	return bullet5WorldPos;
+}
+
 void Bullet::Update()
 {
 	//==========//
@@ -41,6 +57,13 @@ void Bullet::Update()
 	bulletWorldTransform_.matWorld_ = MakeAffineMatrix(bulletWorldTransform_.scale_, bulletWorldTransform_.rotation_, bulletWorldTransform_.translation_);
 	// 行列をGPUなどに転送して描画準備
 	bulletWorldTransform_.TransferMatrix();
+	for (int i = 0; i < 3; i++)
+	{
+		// ワールド行列を作成（スケール、回転、移動を合成）
+		bullet5WorldTransform_[i].matWorld_ = MakeAffineMatrix(bullet5WorldTransform_[i].scale_, bullet5WorldTransform_[i].rotation_, bullet5WorldTransform_[i].translation_);
+		// 行列をGPUなどに転送して描画準備
+		bullet5WorldTransform_[i].TransferMatrix();
+	}
 
 	//==========//
 	//    弾1   //
@@ -51,7 +74,7 @@ void Bullet::Update()
 		bullet1Normal_ = 1;
 		bullet2Reflect_ = 0;
 		bullet3Operation_ = 0;
-		bullet4Rapid_ = 0;
+		bullet4SpeedChange_ = 0;
 		bullet5Trident_ = 0;
 
 		// 弾の速度
@@ -103,7 +126,7 @@ void Bullet::Update()
 		bullet1Normal_ = 0;
 		bullet2Reflect_ = 1;
 		bullet3Operation_ = 0;
-		bullet4Rapid_ = 0;
+		bullet4SpeedChange_ = 0;
 		bullet5Trident_ = 0;
 		
 		// 弾の速度
@@ -180,7 +203,7 @@ void Bullet::Update()
 		bullet1Normal_ = 0;
 		bullet2Reflect_ = 0;
 		bullet3Operation_ = 1;
-		bullet4Rapid_ = 0;
+		bullet4SpeedChange_ = 0;
 		bullet5Trident_ = 0;
 
 		//弾の速度
@@ -245,47 +268,66 @@ void Bullet::Update()
 		bullet1Normal_ = 0;
 		bullet2Reflect_ = 0;
 		bullet3Operation_ = 0;
-		bullet4Rapid_ = 1;
+		bullet4SpeedChange_ = 1;
 		bullet5Trident_ = 0;
 
 		// 弾の速度
 		bulletSpeed_ = 0.6f;
 	}
 
-	if (bullet4Rapid_ == 1)
+	if (bullet4SpeedChange_ == 1)
 	{
-		// スペース押したら弾を生成
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE))
+		if (bulletPoint_ == 1)
 		{
-
-			for (int i = 0; i < MAX_BULLETS; i++)
+			if (Input::GetInstance()->TriggerKey(DIK_SPACE))
 			{
-				if (!bullets_[i].active)
-				{
-					bullets_[i].active = true;
-					bullets_[i].position = player_->GetWorldPosition();
-					bullets_[i].velocity = {0.0f, bulletSpeed_};
-					break;
-				}
+				bulletPoint_ = 0;
+
+				bulletWorldTransform_.translation_ = player_->GetWorldPosition();
+
+				// 発射時の初速
+				currentSpeed_ = bulletSpeed_;
 			}
 		}
-
-		const float SCREEN_TOP = 20.0f;
-
-		// 全弾更新
-		for (int i = 0; i < MAX_BULLETS; i++)
+		else
 		{
-			if (bullets_[i].active)
+			// --- 速度を加減速する部分 ---
+			if (Input::GetInstance()->PushKey(DIK_UP))
 			{
-				bullets_[i].position.x += bullets_[i].velocity.x;
-				bullets_[i].position.y += bullets_[i].velocity.y;
-
-				if (bullets_[i].position.y > SCREEN_TOP)
-				{
-					bullets_[i].active = false;
-					bullets_[i].position.y = -1000.0f;
-				}
+				currentSpeed_ += bullet4Acceleration_; // 加速
 			}
+			else if (Input::GetInstance()->PushKey(DIK_DOWN))
+			{
+				currentSpeed_ -= bullet4Acceleration_; // 減速
+			}
+
+			// 速度制限
+			currentSpeed_ = std::clamp(currentSpeed_, minSpeed_, maxSpeed_);
+
+			// 弾速度に反映
+			bulletVelocity_.x = 0.0f;
+			bulletVelocity_.y = currentSpeed_;
+
+			// 弾を移動
+			bulletWorldTransform_.translation_.y += bulletVelocity_.y;
+		}
+
+		// 画面外に出たらリセット
+		const float SCREEN_TOP = 20.0f;
+		const float SCREEN_BOTTOM = -20.0f;
+		if (bulletWorldTransform_.translation_.y > SCREEN_TOP)
+		{
+			bulletVelocity_ = {0.0f, 0.0f};
+			bulletPoint_ = 1;
+			currentSpeed_ = 0.0f; // 速度リセット
+			bulletWorldTransform_.translation_.y = -1000.0f;
+		}
+		if (bulletWorldTransform_.translation_.y < SCREEN_BOTTOM)
+		{
+			bulletVelocity_ = {0.0f, 0.0f};
+			bulletPoint_ = 1;
+			currentSpeed_ = 0.0f; // 速度リセット
+			bulletWorldTransform_.translation_.y = -1000.0f;
 		}
 	}
 
@@ -298,46 +340,57 @@ void Bullet::Update()
 		bullet1Normal_ = 0;
 		bullet2Reflect_ = 0;
 		bullet3Operation_ = 0;
-		bullet4Rapid_ = 0;
+		bullet4SpeedChange_ = 0;
 		bullet5Trident_ = 1;
 
 		// 弾の速度
-		bulletSpeed_ = 0.1f;
+		bulletSpeed_ = 0.4f;
 	}
 	if (bullet5Trident_ == 1)
 	{
 		if (bulletPoint_ == 1)
 		{
-			// SPACE を押したら発射
 			if (Input::GetInstance()->TriggerKey(DIK_SPACE))
 			{
-				bulletPoint_ = 0; // 発射中;
+				bulletPoint_ = 0;
 
-				// 自機に移動
-				bulletWorldTransform_.translation_ = player_->GetWorldPosition();
+				Vector3 base = player_->GetWorldPosition();
 
-				// 上方向へ発射
-				bulletVelocity_.x = 0.0f;
-				bulletVelocity_.y = bulletSpeed_;
+				float offsetX[3] = {0.0f, -0.1f, 0.1f};
+
+				for (int i = 0; i < 3; i++)
+				{
+					bullet5WorldTransform_[i].translation_ = base;
+
+					bullet5Velocity_[i].x = offsetX[i];
+					bullet5Velocity_[i].y = bulletSpeed_;
+				}
 			}
 		}
 		else
 		{
-
-			bulletVelocity_.y = bulletSpeed_;
-
-			// ★ 弾3の独自移動処理（ここが弾の移動）
-			bulletWorldTransform_.translation_.x += bulletVelocity_.x;
-			bulletWorldTransform_.translation_.y += bulletVelocity_.y;
+			for (int i = 0; i < 3; i++)
+			{
+				bullet5WorldTransform_[i].translation_.x += bullet5Velocity_[i].x;
+				bullet5WorldTransform_[i].translation_.y += bullet5Velocity_[i].y;
+			}
 		}
 
-		// 画面外に出たらリセット
+		// ---- 正しい画面外処理 ----
 		const float SCREEN_TOP = 20.0f;
-		if (bulletWorldTransform_.translation_.y > SCREEN_TOP)
+
+		for (int i = 0; i < 3; i++)
 		{
-			bulletVelocity_ = {0.0f, 0.0f};
-			bulletPoint_ = 1;
-			bulletWorldTransform_.translation_.y = -1000.0f;
+			if (bullet5WorldTransform_[i].translation_.y > SCREEN_TOP)
+			{
+				// 3つまとめてリセット
+				for (int j = 0; j < 3; j++)
+				{
+					bullet5WorldTransform_[j].translation_.y = -1000.0f;
+					bullet5Velocity_[j] = {0.0f, 0.0f};
+				}
+				bulletPoint_ = 1;
+			}
 		}
 	}
 
@@ -374,25 +427,12 @@ void Bullet::Draw()
 		}
 	}
 
-	if (bullet4Rapid_ == 1)
+	if (bullet4SpeedChange_ == 1)
 	{
-		for (int i = 0; i < MAX_BULLETS; i++)
+		if (bulletPoint_ == 0)
 		{
-			if (bullets_[i].active)
-			{
-
-				// 弾の位置をワールド変換にセット
-				bulletWorldTransform_.translation_ = bullets_[i].position;
-
-				// ワールド行列の再生成（スケール・回転・平行移動を合成）
-				bulletWorldTransform_.matWorld_ = MakeAffineMatrix(bulletWorldTransform_.scale_, bulletWorldTransform_.rotation_, bulletWorldTransform_.translation_);
-
-				// 行列をGPUなどに転送（描画準備）
-				bulletWorldTransform_.TransferMatrix();
-
-				// 描画（bulletCamera_ がポインタなら *bulletCamera_）
-				bulletModel_->Draw(bulletWorldTransform_, *bulletCamera_);
-			}
+			// モデルを現在の変換行列とカメラ情報を使って描画
+			bulletModel_->Draw(bulletWorldTransform_, *bulletCamera_);
 		}
 	}
 
@@ -400,8 +440,11 @@ void Bullet::Draw()
 	{
 		if (bulletPoint_ == 0)
 		{
-			// モデルを現在の変換行列とカメラ情報を使って描画
-			bulletModel_->Draw(bulletWorldTransform_, *bulletCamera_);
+			for (int i = 0; i < 3; i++)
+			{
+				// モデルを現在の変換行列とカメラ情報を使って描画
+				bulletModel_->Draw(bullet5WorldTransform_[i], *bulletCamera_);
+			}
 		}
 	}
 
