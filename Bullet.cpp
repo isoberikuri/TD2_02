@@ -11,14 +11,16 @@ void Bullet::Initialize(Model* model, Camera* camera, Vector3& position)
 	assert(model);
 	bulletModel_ = model;
 	bulletWorldTransform_.translation_ = position;
+	bulletCamera_ = camera;
+	bulletWorldTransform_.Initialize();
+
+	// トライデント用
 	for (int i = 0; i < 3; i++)
 	{
 		bullet5WorldTransform_[i].translation_ = position;
 		bullet5WorldTransform_[i].translation_.x += i;
 		bullet5WorldTransform_[i].Initialize();
 	}
-	bulletCamera_ = camera;
-	bulletWorldTransform_.Initialize();
 
 	// SetPlayerは外部で呼ぶのでここでは呼ばない
 }
@@ -35,6 +37,7 @@ Vector3 Bullet::GetWorldPosition()
 
 }
 
+// トライデント用
 KamataEngine::Vector3 Bullet::bullet5GetWorldPosition(int i)
 {
 	Vector3 bullet5WorldPos;
@@ -344,7 +347,7 @@ void Bullet::Update()
 		bullet5Trident_ = 1;
 
 		// 弾の速度
-		bulletSpeed_ = 0.4f;
+		bulletSpeed_ = 0.6f;
 	}
 	if (bullet5Trident_ == 1)
 	{
