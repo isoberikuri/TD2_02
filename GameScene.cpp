@@ -1,10 +1,13 @@
 #include "GameScene.h"
 #include "Player.h"
 #include "Bullet.h"
+#include <cstdlib>
+#include <ctime>
 
 using namespace KamataEngine;
 
-void GameScene::Initialize() {
+void GameScene::Initialize()
+{
 
      // ===== カメラ初期化（必ず最初）=====
 	camera_.Initialize();
@@ -28,6 +31,13 @@ void GameScene::Initialize() {
 	Vector3 bulletPos = {0, 0, 0};
 	bullet_->Initialize(modelBullet_, &camera_, bulletPos);
 
+	// セレクトカード画像読み込み
+	bulletSelect1Handle_ = TextureManager::Load("BulletCard/NormalBulletCard.png");
+	bulletSelect1Sprite_ = Sprite::Create(bulletSelect1Handle_, {bulletSelect1PosX_, bulletSelect1PosY_});
+	bulletSelect2Handle_ = TextureManager::Load("BulletCard/NormalBulletCard.png");
+	bulletSelect2Sprite_ = Sprite::Create(bulletSelect2Handle_, {bulletSelect2PosX_, bulletSelect2PosY_});
+	std::srand((unsigned int)std::time(nullptr));
+
 	// ★ ここで必ず SetPlayer する！
 	bullet_->SetPlayer(player_);
 }
@@ -42,64 +52,170 @@ GameScene::~GameScene()
 	delete modelBullet_;
 }
 
+//=========================//
+//     カード画像変更      //
+//=========================//
+
+void GameScene::SetCardTexture(Sprite* sprite, int cardNo)
+{ 
+	sprite->SetTextureHandle(TextureManager::Load(GetCardPath(cardNo)));
+}
+
+//=========================//
+//       モデル切替        //
+//=========================//
+
+void GameScene::ChangeBulletModel(int type)
+{
+	delete modelBullet_;
+	switch (type) {
+	case 1:
+		modelBullet_ = Model::CreateFromOBJ("bullet1", true);
+		break;
+	case 2:
+		modelBullet_ = Model::CreateFromOBJ("bullet2", true);
+		break;
+	case 3:
+		modelBullet_ = Model::CreateFromOBJ("bullet3", true);
+		break;
+	case 4:
+		modelBullet_ = Model::CreateFromOBJ("bullet4", true);
+		break;
+	case 5:
+		modelBullet_ = Model::CreateFromOBJ("bullet5", true);
+		break;
+	}
+	bullet_->SetModel(modelBullet_);
+}
+std::string GameScene::GetCardPath(int type)
+{
+	switch (type)
+	{
+	case 1:
+		return "BulletCard/NormalBulletCard.png";
+	case 2:
+		return "BulletCard/ReflectBulletCard.png";
+	case 3:
+		return "BulletCard/OperationBulletCard.png";
+	case 4:
+		return "BulletCard/SpeedChangeBulletCard.png";
+	case 5:
+		return "BulletCard/TridentBulletCard.png";
+	}
+	return "BulletCard/NormalBulletCard.png";
+}
 void GameScene::Update() {
 
 
 	//=====================//
-	//    弾の描画変更用   //
+	//    弾・モデル切替   //
 	//=====================//
-	int currentType = 0;
+	int currentType = bullet_->GetCurrentBulletType();
 
-	if (bullet_->bullet1Normal_ == 1)
-		currentType = 1;
-	if (bullet_->bullet2Reflect_ == 1)
-		currentType = 2;
-	if (bullet_->bullet3Operation_ == 1)
-		currentType = 3;
-	if (bullet_->bullet4SpeedChange_ == 1)
-		currentType = 4;
-	if (bullet_->bullet5Trident_ == 1)
-		currentType = 5;
-
-	// 種類が変わった時だけ実行する
-	if (currentType != prevBulletType_) {
-
-		delete modelBullet_;
-
-		if (currentType == 1)
-			modelBullet_ = Model::CreateFromOBJ("bullet1", true);
-		if (currentType == 2)
-			modelBullet_ = Model::CreateFromOBJ("bullet2", true);
-		if (currentType == 3)
-			modelBullet_ = Model::CreateFromOBJ("bullet3", true);
-		if (currentType == 4)
-			modelBullet_ = Model::CreateFromOBJ("bullet4", true);
-		if (currentType == 5)
-			modelBullet_ = Model::CreateFromOBJ("bullet5", true);
-
-		bullet_->SetModel(modelBullet_);
+	if (currentType != prevBulletType_)
+	{
+		ChangeBulletModel(currentType);
 	}
 	prevBulletType_ = currentType;
 
-	//==========//
-	//	その他  //
-	//==========//
-	// プレイヤー
-    if (player_) {
-        player_->Update();
-    }
-	// 弾
-	if (bullet_) {
-		bullet_->Update();
+	//=======================//
+	//   カード選択フェーズ  //
+	//=======================//
+	
+	if (bulletSelectPoint_ == 1)
+	{
+		if (Input::GetInstance()->TriggerKey(DIK_A))
+			SelectSet_ = 1;
+
+		if (Input::GetInstance()->TriggerKey(DIK_D))
+			SelectSet_ = 2;
+
+		// ★ どちらを選択しているかによって拡大率変更
+		if (SelectSet_ == 1)
+		{
+			bulletSelect1Sprite_->SetSize({336 * 1.2f, 528 * 1.2f});
+			bulletSelect2Sprite_->SetSize({336, 528});
+		}
+		else
+		{
+			bulletSelect1Sprite_->SetSize({336, 528});
+			bulletSelect2Sprite_->SetSize({336 * 1.2f, 528 * 1.2f});
+		}
+
+		// SPACE 決定
+		if (Input::GetInstance()->TriggerKey(DIK_RETURN))
+		{
+			int chosenCard = (SelectSet_ == 1) ? Select1Point_ : Select2Point_;
+
+			bullet_->SetBulletType(chosenCard);
+			ChangeBulletModel(chosenCard);
+
+			bulletSelectPoint_ = 0;
+			bulletSelectTime_ = 300;
+		}
 	}
+	
+	//===========================//
+	//      プレイフェーズ       //
+	//===========================//
+	if (bulletSelectPoint_ == 0)
+	{
+		bulletSelectTime_--;
 
+		if (bulletSelectTime_ <= 0)
+		{
+			bulletSelectPoint_ = 1;
+			bullet_->ResetBulletState();
 
-    // カメラは固定（プレイヤー追従しない）
-    camera_.TransferMatrix();
+			// ランダムカード生成
+			Select1Point_ = (std::rand() % 5) + 1;
+			Select2Point_ = (std::rand() % 5) + 1;
+
+			// カード画像切替
+			SetCardTexture(bulletSelect1Sprite_, Select1Point_);
+			SetCardTexture(bulletSelect2Sprite_, Select2Point_);
+
+			SelectSet_ = 1;
+		}
+		//==========//
+		//	その他  //
+		//==========//
+		// プレイヤー
+		if (player_)
+		{
+			player_->Update();
+		}
+		// 弾
+		if (bullet_)
+		{
+			bullet_->Update();
+		}
+		camera_.TransferMatrix();
+	}
 }
 
 void GameScene::Draw()
 {
+
+	//=========================//
+	//    2Dスプライト描画     //
+	//=========================//
+	if (bulletSelectPoint_ == 1) // ←追加
+	{
+		Sprite::PreDraw();
+
+		// セレクトカードを描画
+		bulletSelect1Sprite_->Draw();
+		bulletSelect2Sprite_->Draw();
+
+		// スプライト描画後処理
+		Sprite::PostDraw();
+	}
+
+	//=========================//
+	//    3Dスプライト描画     //
+	//=========================//
+	
 	Model::PreDraw();
 
     //自機

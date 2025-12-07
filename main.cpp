@@ -14,7 +14,7 @@ GameScene* gameScene = nullptr;
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// エンジン初期化
-	KamataEngine::Initialize(L"TD2_ゲーム");
+	KamataEngine::Initialize(L"2262_エアフォース");
 
 	// GameScene を生成
 	gameScene = new GameScene();

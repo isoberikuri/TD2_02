@@ -55,6 +55,26 @@ public:
 	float bulletSpeed_ = 0.0f;
 	void SetModel(KamataEngine::Model* model);
 
+	//=============//
+	//   弾選択用  //
+	//=============//
+	
+	 // 現在の弾種を返す（1〜5。未設定なら 0 を返す）
+	int GetCurrentBulletType() const;
+	// 弾種をセットする（1〜5）。0 を渡すと全フラグをリセットします
+	void SetBulletType(int type);
+	//リフレクション ->トライデント エラー用
+	void ResetBulletState()
+	{
+		bulletVelocity_ = {0.0f, 0.0f};
+		bulletPoint_ = 1;
+		bulletWorldTransform_.translation_.y = -1000.0f;
+		for (int j = 0; j < 3; j++)
+		{
+			bullet5WorldTransform_[j].translation_.y = -1000.0f;
+			bullet5Velocity_[j] = {0.0f, 0.0f};
+		}
+	}
 
 private:
 	// ===== 基本データ =====
